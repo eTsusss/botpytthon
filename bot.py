@@ -6,7 +6,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes, ConversationHandler
 from openpyxl import Workbook, load_workbook
 from telegram.error import TimedOut
-from telegram.request import HTTPXRequest
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -160,39 +159,26 @@ async def get_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: await update.message.reply_text("Файл с пользователями пока не создан.")
     else: await update.message.reply_text("У вас нет доступа к этой команде.")
 
-def run_bot():
-    try:
-        # ЗАМЕНА: Используем SOCKS5 прокси для выхода в интернет
-        request = HTTPXRequest(
-            connect_timeout=60.0,
-            read_timeout=60.0,
-            proxy="socks5://45.11.89.36:1080" # Бесплатный российский прокси
-        )
-        
-        app = Application.builder().token(TOKEN).request(request).build()
-        
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("getusers", get_users))
-        app.add_handler(ConversationHandler(
-            entry_points=[CommandHandler("broadcast", broadcast_start)],
-            states={
-                BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
-                BROADCAST_PHOTO: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, broadcast_photo)],
-                BROADCAST_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_link)],
-            },
-            fallbacks=[CommandHandler("cancel", broadcast_cancel)],
-        ))
-        app.add_handler(CallbackQueryHandler(button_handler))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+def main():
+    # На Render прокси НЕ НУЖЕН! Он сам находится в Европе.
+    app = Application.builder().token(TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("getusers", get_users))
+    app.add_handler(ConversationHandler(
+        entry_points=[CommandHandler("broadcast", broadcast_start)],
+        states={
+            BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
+            BROADCAST_PHOTO: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, broadcast_photo)],
+            BROADCAST_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_link)],
+        },
+        fallbacks=[CommandHandler("cancel", broadcast_cancel)],
+    ))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-        print("Пытаемся запустить бота через SOCKS5 прокси...")
-        app.run_polling(drop_pending_updates=True)
-        
-    except (TimedOut, Exception) as e:
-        print(f"Бот упал с ошибкой (скорее всего прокси не работает): {e}")
-        print("Ждем 20 секунд и пробуем снова...")
-        time.sleep(20)
-        run_bot()
+    print("✅ Бот запускается на Render...")
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    run_bot()
+    main()
