@@ -2,6 +2,9 @@ import re
 import os
 import logging
 import time
+import threading  # ДОБАВЛЕНО для работы веб-сервера в фоне
+from flask import Flask  # ДОБАВЛЕНО для имитации веб-сервера
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes, ConversationHandler
 from openpyxl import Workbook, load_workbook
@@ -177,8 +180,29 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("✅ Бот запускается на Render...")
+    print("✅ Бот и веб-сервер запускаются на Render...")
+    
+    # ЗАПУСК БОТА В ОСНОВНОМ ПОТОКЕ
     app.run_polling(drop_pending_updates=True)
+
+# ==============================================================
+# НИЖЕ ДОБАВЛЕН КОД ДЛЯ ВЕБ-СЕРВЕРА (Он работает в фоновом потоке)
+# ==============================================================
+# Создаём фейковый веб-сервер, чтобы Render думал, что у нас сайт
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "Bot is running 24/7!"
+
+def run_web():
+    # Запускаем веб-сервер на порту 10000 (Render увидит его и не усыпит бота)
+    web_app.run(host='0.0.0.0', port=10000)
+
+# Запускаем веб-сервер в отдельном потоке (параллельно с основным ботом)
+threading.Thread(target=run_web, daemon=True).start()
+
+# ==============================================================
 
 if __name__ == "__main__":
     main()
